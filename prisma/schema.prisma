@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "extendedIndexes"]
+ 
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+
+model LongTermMemory {
+  id        String                 @id @default(uuid())
+  chatId    String
+  content   String
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime               @default(now())
+
+  // @@index([embedding], map: "embedding_idx", type: Hnsw) <-- Hapus/Komentari ini
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  chatId      String
+  merchant    String?
+  amount      Float
+  type        String   @default("EXPENSE") // INCOME atau EXPENSE
+  category    String?
+  description String?
+  items       Json? // Menyimpan daftar barang dalam format JSON
+  date        DateTime @default(now()) // Tanggal di struk
+  createdAt   DateTime @default(now()) // Tanggal data masuk ke sistem
+  debts       Debt[]
+
+  @@index([chatId])
+}
+
+model Debt {
+  id            String       @id @default(uuid())
+  chatId        String
+  personName    String
+  amount        Float
+  isPaid        Boolean      @default(false)
+  description   String?
+  transactionId String?
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([chatId])
+}
