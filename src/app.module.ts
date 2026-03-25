@@ -4,8 +4,12 @@ import { AppService } from './app.service';
 import { PrismaModule } from 'nestjs-prisma';
 import { McpModule } from '@nestjs-mcp/server';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { FinanceService } from './finance/finance.service';
-import { FinanceResolver } from './finance/finance.resolver';
+import { TransactionService } from './transaction/transaction.service';
+import { TransactionResolver } from './transaction/transaction.resolver';
+import { SplitBillService } from './split-bill/split-bill.service';
+import { SplitBillResolver } from './split-bill/split-bill.resolver';
+import { MemoryService } from './memory/memory.service';
+import { MemoryResolver } from './memory/memory.resolver';
 
 @Module({
   imports: [
@@ -25,6 +29,14 @@ import { FinanceResolver } from './finance/finance.resolver';
     }),
   ],
   controllers: [AppController],
-  providers: [AppService, FinanceService, FinanceResolver],
+  providers: [
+    AppService,
+    TransactionService,
+    TransactionResolver,
+    SplitBillService,
+    SplitBillResolver,
+    MemoryService,
+    MemoryResolver
+  ],
 })
 export class AppModule {}
