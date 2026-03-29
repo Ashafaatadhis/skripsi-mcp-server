@@ -33,7 +33,10 @@ export class TransactionResolver {
       content: [
         {
           type: 'text',
-          text: `Transaction added successfully: ${transaction.id} (${transaction.type} - ${transaction.amount})`,
+          text: `<b>✅ Transaksi berhasil dicatat</b>\n` +
+                `🧾 Tipe: <b>${transaction.type}</b>\n` +
+                `💵 Jumlah: <code>Rp ${transaction.amount.toLocaleString('id-ID')}</code>\n` +
+                `🆔 ID: <code>${transaction.id.substring(0, 8)}</code>`,
         },
       ],
     };
@@ -53,7 +56,10 @@ export class TransactionResolver {
       content: [
         {
           type: 'text',
-          text: `Balance for ${chatId}:\n- Income: ${res.income}\n- Expense: ${res.expense}\n- Total Balance: ${res.balance}`,
+          text: `<b>RINGKASAN SALDO</b>\n` +
+                `💰 Income: <code>Rp ${res.income.toLocaleString('id-ID')}</code>\n` +
+                `💸 Expense: <code>Rp ${res.expense.toLocaleString('id-ID')}</code>\n` +
+                `📌 Total Balance: <code>Rp ${res.balance.toLocaleString('id-ID')}</code>`,
         },
       ],
     };
@@ -77,10 +83,10 @@ export class TransactionResolver {
           const itemsPart = t.items.map((i: any) => `${i.name} (x${i.qty})`).join(', ');
           itemStr = `\n   📦 Items: ${itemsPart}`;
         }
-        return `📅 ${t.date.toISOString().split('T')[0]} | ${t.type === 'INCOME' ? '💰' : '💸'} *${t.type}*\n` +
+        return `📅 ${t.date.toISOString().split('T')[0]} | ${t.type === 'INCOME' ? '💰' : '💸'} <b>${t.type}</b>\n` +
                `   🏢 ${t.merchant ?? 'Unknown'} (${t.category ?? 'N/A'})\n` +
                `   💵 Amount: Rp ${t.amount.toLocaleString('id-ID')}\n` +
-               `   🆔 ID: \`${t.id.substring(0, 8)}\`${itemStr}\n`;
+               `   🆔 ID: <code>${t.id.substring(0, 8)}</code>${itemStr}\n`;
       })
       .join('---\n');
     
@@ -88,7 +94,7 @@ export class TransactionResolver {
       content: [
         {
           type: 'text',
-          text: text || 'No transactions found.',
+          text: text || '<b>Belum ada transaksi.</b>',
         },
       ],
     };
@@ -108,7 +114,7 @@ export class TransactionResolver {
     
     if (!t) {
       return {
-        content: [{ type: 'text', text: `Transaction with ID "${transactionId}" not found.` }],
+        content: [{ type: 'text', text: `<b>❌ Transaksi tidak ditemukan</b>\n🆔 ID: <code>${transactionId}</code>` }],
       };
     }
 
@@ -118,11 +124,11 @@ export class TransactionResolver {
       itemStr = `\n   📦 Items: ${itemsPart}`;
     }
 
-    const text = `📅 ${t.date.toISOString().split('T')[0]} | ${t.type === 'INCOME' ? '💰' : '💸'} *${t.type}*\n` +
+    const text = `📅 ${t.date.toISOString().split('T')[0]} | ${t.type === 'INCOME' ? '💰' : '💸'} <b>${t.type}</b>\n` +
                  `   🏢 ${t.merchant ?? 'Unknown'} (${t.category ?? 'N/A'})\n` +
                  `   💵 Amount: Rp ${t.amount.toLocaleString('id-ID')}\n` +
                  `   📝 Description: ${t.description || '-'}\n` +
-                 `   🆔 ID: \`${t.id}\`${itemStr}`;
+                 `   🆔 ID: <code>${t.id}</code>${itemStr}`;
 
     return {
       content: [{ type: 'text', text }],

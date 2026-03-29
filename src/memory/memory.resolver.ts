@@ -23,12 +23,12 @@ export class MemoryResolver {
     
     if (!results) {
       return {
-        content: [{ type: 'text', text: "Sebenarnya tidak ada memori yang relevan ditemukan." }],
+        content: [{ type: 'text', text: '<b>ℹ️ Tidak ada memori relevan yang ditemukan.</b>' }],
       };
     }
 
     return {
-      content: [{ type: 'text', text: results }],
+      content: [{ type: 'text', text: `<b>HASIL MEMORI</b>\n${results}` }],
     };
   }
 
@@ -45,7 +45,7 @@ export class MemoryResolver {
     await this.memoryService.saveToLongTermMemory(chatId, fact);
     
     return {
-      content: [{ type: 'text', text: "Fakta berhasil disimpan ke memori jangka panjang." }],
+      content: [{ type: 'text', text: '<b>✅ Fakta berhasil disimpan ke memori jangka panjang.</b>' }],
     };
   }
 }

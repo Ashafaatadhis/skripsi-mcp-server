@@ -47,9 +47,11 @@ export class SplitBillResolver {
       if (existingDebts.length > 0) {
         const names = existingDebts.map(d => d.personName).join(', ');
         return {
-          content: [{ 
-            type: 'text', 
-            text: `⚠️ Transaksi ini sudah pernah dibagi sebelumnya kepada: ${names}. Tidak bisa membagi ulang transaksi yang sama untuk menghindari data ganda.` 
+          content: [{
+            type: 'text',
+            text: `<b>⚠️ Split bill sudah ada</b>\n` +
+                  `Transaksi ini sudah pernah dibagi ke: <b>${names}</b>\n` +
+                  `Tidak bisa membagi ulang transaksi yang sama untuk menghindari data ganda.`
           }],
         };
       }
@@ -87,7 +89,11 @@ export class SplitBillResolver {
       content: [
         {
           type: 'text',
-          text: `Bill of ${params.totalAmount} split successfully among ${params.participants.length + 1} people. ${targetTransactionId === params.transactionId ? '(Menggunakan transaksi lama)' : '(Transaksi baru dicatat)'}. Masing-masing teman berhutang ${share.toLocaleString('id-ID')}.`,
+          text: `<b>✅ Split bill berhasil</b>\n` +
+                `👥 Total peserta: <b>${params.participants.length + 1}</b> orang\n` +
+                `💵 Total tagihan: <code>Rp ${params.totalAmount.toLocaleString('id-ID')}</code>\n` +
+                `💸 Hutang per orang: <code>Rp ${share.toLocaleString('id-ID')}</code>\n` +
+                `🧾 Status transaksi: ${targetTransactionId === params.transactionId ? 'Menggunakan transaksi lama' : 'Transaksi baru dicatat'}.`,
         },
       ],
     };
@@ -124,7 +130,7 @@ export class SplitBillResolver {
       content: [
         {
           type: 'text',
-          text: text ? `<b>DAFTAR HUTANG (${status}):</b>\n\n${text}` : 'Tidak ada catatan hutang.',
+          text: text ? `<b>DAFTAR HUTANG (${status}):</b>\n\n${text}` : '<b>Tidak ada catatan hutang.</b>',
         },
       ],
     };
@@ -158,13 +164,17 @@ export class SplitBillResolver {
         content: [
           {
             type: 'text',
-            text: `Piutang dari ${settledDebt.personName} sebesar ${settledDebt.amount} telah ditandai LUNAS dan dicatat sebagai pemasukan (INCOME). ✅`,
+            text: `<b>✅ Hutang berhasil dilunasi</b>\n` +
+                  `👤 Nama: <b>${settledDebt.personName}</b>\n` +
+                  `💵 Jumlah: <code>Rp ${settledDebt.amount.toLocaleString('id-ID')}</code>\n` +
+                  `📌 Status: <b>LUNAS</b>\n` +
+                  `💰 Pelunasan juga sudah dicatat sebagai pemasukan (INCOME).`,
           },
         ],
       };
     } catch (error: any) {
       return {
-        content: [{ type: 'text', text: `Error: ${error.message}` }],
+        content: [{ type: 'text', text: `<b>❌ Gagal melunasi hutang</b>\n${error.message}` }],
         isError: true,
       };
     }
@@ -190,14 +200,18 @@ export class SplitBillResolver {
     const debts = await this.splitBillService.getDebtsByTransactionId(tx.id);
     
     const text = debts
-      .map((d: any) => `👤 <b>${d.personName}</b> - <code>Rp ${d.amount.toLocaleString('id-ID')}</code> (${d.isPaid ? '✅' : '⏳'})`)
-      .join('\n');
+      .map((d: any) => `👤 <b>${d.personName}</b> - <code>Rp ${d.amount.toLocaleString('id-ID')}</code>\n` +
+                       `   🆔 DebtID: <code>${d.id.substring(0,8)}</code>\n` +
+                       `   📌 Status: ${d.isPaid ? '✅ Lunas' : '⏳ Belum Lunas'}`)
+      .join('\n\n');
 
     return {
       content: [
         {
           type: 'text',
-          text: text ? `<b>ANGGOTA SPLIT BILL (${tx.merchant || 'Transaksi'}):</b>\n\n${text}` : 'Belum ada catatan split untuk transaksi ini.',
+          text: text ? `<b>ANGGOTA SPLIT BILL</b>\n` +
+                       `🏢 Merchant: ${tx.merchant || 'Transaksi'}\n` +
+                       `🆔 TxID: <code>${tx.id.substring(0,8)}</code>\n\n${text}` : '<b>Belum ada catatan split untuk transaksi ini.</b>',
         },
       ],
     };
@@ -217,7 +231,7 @@ export class SplitBillResolver {
 
     if (!d) {
       return {
-        content: [{ type: 'text', text: `Catatan hutang dengan ID "${debtId}" tidak ditemukan.` }],
+        content: [{ type: 'text', text: `<b>❌ Catatan hutang tidak ditemukan</b>\n🆔 Debt ID: <code>${debtId}</code>` }],
       };
     }
 
