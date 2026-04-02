@@ -21,14 +21,21 @@ export class MemoryResolver {
     this.logger.log(`Tool search_memory dipanggil untuk: "${query}"`);
     const results = await this.memoryService.searchLongTermMemory(chatId, query);
     
-    if (!results) {
+    if (!results || results.length === 0) {
       return {
         content: [{ type: 'text', text: '<b>ℹ️ Tidak ada memori relevan yang ditemukan.</b>' }],
       };
     }
 
+    const text = results
+      .map(
+        (result, index) =>
+          `${index + 1}. ${result.content}\n   relevansi: ${(1 - result.distance).toFixed(2)} | disimpan: ${new Date(result.createdAt).toISOString().split('T')[0]}`,
+      )
+      .join('\n');
+
     return {
-      content: [{ type: 'text', text: `<b>HASIL MEMORI</b>\n${results}` }],
+      content: [{ type: 'text', text: `<b>HASIL MEMORI</b>\n${text}` }],
     };
   }
 
@@ -42,10 +49,10 @@ export class MemoryResolver {
   })
   async saveMemory({ chatId, fact }: { chatId: string; fact: string }) {
     this.logger.log(`Tool save_memory dipanggil untuk fakta: "${fact}"`);
-    await this.memoryService.saveToLongTermMemory(chatId, fact);
+    const saved = await this.memoryService.saveToLongTermMemory(chatId, fact);
     
     return {
-      content: [{ type: 'text', text: '<b>✅ Fakta berhasil disimpan ke memori jangka panjang.</b>' }],
+      content: [{ type: 'text', text: saved ? '<b>✅ Fakta berhasil disimpan ke memori jangka panjang.</b>' : '<b>ℹ️ Fakta yang sama sudah pernah disimpan.</b>' }],
     };
   }
 }

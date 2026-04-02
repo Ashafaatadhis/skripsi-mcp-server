@@ -1,6 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'nestjs-prisma';
 
+type ResolutionMatch<T> =
+  | { status: 'resolved'; record: T }
+  | { status: 'not_found' }
+  | { status: 'ambiguous'; matches: T[] };
+
+type SettleDebtResult =
+  | { status: 'resolved'; record: any }
+  | { status: 'already_paid'; record: any }
+  | { status: 'not_found' }
+  | { status: 'ambiguous'; matches: any[] };
+
 @Injectable()
 export class SplitBillService {
   private readonly logger = new Logger(SplitBillService.name);
@@ -31,26 +42,68 @@ export class SplitBillService {
     });
   }
 
-  async settleDebt(debtId: string, chatId?: string) {
-    this.logger.log(`Settling debt ${debtId}`);
-    
-    // Jika debtId kurang dari 36 (panjang UUID), cari yang mirip
-    if (debtId.length < 36) {
-      const debt = await this.prisma.debt.findFirst({
-        where: {
-          id: { startsWith: debtId },
-          ...(chatId ? { chatId } : {}),
+  async resolveDebtById(debtId: string, chatId?: string): Promise<ResolutionMatch<any>> {
+    const trimmedId = debtId.trim();
+    const matches = await this.prisma.debt.findMany({
+      where:
+        trimmedId.length < 36
+          ? {
+              id: { startsWith: trimmedId },
+              ...(chatId ? { chatId } : {}),
+            }
+          : {
+              id: trimmedId,
+              ...(chatId ? { chatId } : {}),
+            },
+      orderBy: { createdAt: 'desc' },
+      take: trimmedId.length < 36 ? 5 : 1,
+      include: { transaction: true },
+    });
+
+    if (matches.length === 0) {
+      return { status: 'not_found' };
+    }
+
+    if (matches.length > 1) {
+      return { status: 'ambiguous', matches };
+    }
+
+    return { status: 'resolved', record: matches[0] };
+  }
+
+  async findDebtsByPerson(chatId: string, personName: string, isPaid?: boolean) {
+    return this.prisma.debt.findMany({
+      where: {
+        chatId,
+        personName: {
+          equals: personName.trim(),
+          mode: 'insensitive',
         },
-      });
-      if (!debt) throw new Error('Debt record not found with that short ID');
-      debtId = debt.id;
+        ...(isPaid !== undefined ? { isPaid } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: { transaction: true },
+    });
+  }
+
+  async settleDebt(debtId: string, chatId?: string): Promise<SettleDebtResult> {
+    this.logger.log(`Settling debt ${debtId}`);
+    const resolved = await this.resolveDebtById(debtId, chatId);
+
+    if (resolved.status !== 'resolved') {
+      return resolved;
+    }
+
+    if (resolved.record.isPaid) {
+      return { status: 'already_paid', record: resolved.record };
     }
 
     const updatedDebt = await this.prisma.debt.update({
-      where: { id: debtId },
+      where: { id: resolved.record.id },
       data: { isPaid: true },
+      include: { transaction: true },
     });
-    return updatedDebt;
+    return { status: 'resolved', record: updatedDebt };
   }
 
   async getDebtsByTransactionId(transactionId: string) {
@@ -60,18 +113,7 @@ export class SplitBillService {
   }
 
   async getDebtById(debtId: string, chatId?: string) {
-    if (debtId.length < 36) {
-      return this.prisma.debt.findFirst({
-        where: {
-          id: { startsWith: debtId },
-          ...(chatId ? { chatId } : {}),
-        },
-        include: { transaction: true },
-      });
-    }
-    return this.prisma.debt.findUnique({
-      where: { id: debtId },
-      include: { transaction: true },
-    });
+    const resolved = await this.resolveDebtById(debtId, chatId);
+    return resolved.status === 'resolved' ? resolved.record : null;
   }
 }
