@@ -1,22 +1,19 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from 'nestjs-prisma';
 import { McpModule } from '@nestjs-mcp/server';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TransactionService } from './transaction/transaction.service';
 import { TransactionResolver } from './transaction/transaction.resolver';
 import { SplitBillService } from './split-bill/split-bill.service';
 import { SplitBillResolver } from './split-bill/split-bill.resolver';
 import { MemoryService } from './memory/memory.service';
 import { MemoryResolver } from './memory/memory.resolver';
+import { PrismaService } from './prisma.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    PrismaModule.forRoot({
       isGlobal: true,
     }),
     McpModule.forRoot({
@@ -31,6 +28,7 @@ import { MemoryResolver } from './memory/memory.resolver';
   controllers: [AppController],
   providers: [
     AppService,
+    PrismaService,
     TransactionService,
     TransactionResolver,
     SplitBillService,

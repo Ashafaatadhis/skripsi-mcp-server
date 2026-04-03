@@ -296,6 +296,13 @@ export class SplitBillResolver {
         targetDebtId = candidateDebts[0].id;
       }
 
+      if (!targetDebtId) {
+        return {
+          content: [{ type: 'text', text: '<b>❌ Debt ID tidak tersedia</b>' }],
+          isError: true,
+        };
+      }
+
       const settledDebtResult = await this.splitBillService.settleDebt(targetDebtId, chatId);
 
       if (settledDebtResult.status === 'not_found') {

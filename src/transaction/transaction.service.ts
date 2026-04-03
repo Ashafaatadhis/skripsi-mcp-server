@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from 'nestjs-prisma';
+import { PrismaService } from '../prisma.service';
 
 type ResolutionMatch<T> =
   | { status: 'resolved'; record: T }
@@ -45,6 +45,87 @@ export class TransactionService {
         },
       },
     });
+  }
+
+  async listTransactions(params: {
+    chatId: string;
+    limit?: number;
+    page?: number;
+    type?: string;
+    category?: string;
+    merchant?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  }) {
+    const {
+      chatId,
+      limit = 10,
+      page = 1,
+      type,
+      category,
+      merchant,
+      dateFrom,
+      dateTo,
+    } = params;
+
+    const where = {
+      chatId,
+      ...(type ? { type } : {}),
+      ...(merchant
+        ? {
+            merchant: {
+              contains: merchant,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
+      ...(category
+        ? {
+            category: {
+              contains: category,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
+      ...(dateFrom || dateTo
+        ? {
+            date: {
+              ...(dateFrom ? { gte: dateFrom } : {}),
+              ...(dateTo ? { lte: dateTo } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const skip = (page - 1) * limit;
+
+    const [transactions, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          debts: {
+            select: {
+              id: true,
+              personName: true,
+              amount: true,
+              isPaid: true,
+            },
+          },
+        },
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+
+    return {
+      transactions,
+      total,
+      page,
+      limit,
+      hasMore: skip + transactions.length < total,
+    };
   }
 
   async findTransactions(params: {

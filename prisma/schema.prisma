@@ -6,13 +6,11 @@
 
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions", "extendedIndexes"]
- 
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
   extensions = [vector]
 }
 
@@ -21,10 +19,23 @@ model LongTermMemory {
   id        String                 @id @default(uuid())
   chatId    String
   content   String
+  memoryType String
+  category  String
+  canonicalKey String?
+  importanceScore Float           @default(0.5)
+  confidence Float                @default(1)
+  mentionCount Int                @default(1)
+  lastConfirmedAt DateTime        @default(now())
+  isActive Boolean                @default(true)
+  sourceType String?
+  expiresAt DateTime?
   embedding Unsupported("vector(1536)")
   createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
 
   // @@index([embedding], map: "embedding_idx", type: Hnsw) <-- Hapus/Komentari ini
+  @@index([chatId, memoryType, isActive])
+  @@unique([chatId, canonicalKey])
 }
 
 model Transaction {

@@ -5,7 +5,7 @@ import { TransactionService } from './transaction.service';
 
 const itemSchema = z.object({
   name: z.string().trim().min(1).describe('Item name'),
-  price: z.number().nonnegative().describe('Price per unit'),
+  price: z.number().describe('Price per unit. Can be negative for discount, promo, or voucher lines.'),
   qty: z.number().int().positive().describe('Quantity'),
 });
 
@@ -116,22 +116,91 @@ export class TransactionResolver {
 
   @Tool({
     name: 'list_transactions',
-    description: 'List recent transactions for a chat ID',
+    description: 'List transactions with pagination and optional filters. Use this instead of dumping all transactions at once.',
     paramsSchema: {
       chatId: z.string().describe('Unique ID for the chat or user'),
-      limit: z.number().optional().default(10).describe('Limit results'),
+      limit: z.number().int().positive().max(20).optional().default(10).describe('Maximum number of transactions per page'),
+      page: z.number().int().positive().optional().default(1).describe('Page number starting from 1'),
+      type: z.enum(['INCOME', 'EXPENSE']).optional().describe('Filter by transaction type'),
+      category: z.string().trim().optional().describe('Filter by category'),
+      merchant: z.string().trim().optional().describe('Filter by merchant name'),
+      dateFrom: z.string().optional().describe('Start date in YYYY-MM-DD format'),
+      dateTo: z.string().optional().describe('End date in YYYY-MM-DD format'),
     },
   })
-  async listTransactions({ chatId, limit }: { chatId: string; limit: number }) {
-    this.logger.log(`Tool list_transactions called for ${chatId} (limit: ${limit})`);
-    const transactions = await this.transactionService.getTransactions(chatId, limit);
-    const text = transactions.map((transaction: any) => formatTransactionLine(transaction)).join('---\n');
+  async listTransactions(params: {
+    chatId: string;
+    limit: number;
+    page: number;
+    type?: 'INCOME' | 'EXPENSE';
+    category?: string;
+    merchant?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    this.logger.log(`Tool list_transactions called with params: ${JSON.stringify(params)}`);
+
+    const dateFrom = params.dateFrom ? new Date(`${params.dateFrom}T00:00:00.000Z`) : undefined;
+    const dateTo = params.dateTo ? new Date(`${params.dateTo}T23:59:59.999Z`) : undefined;
+
+    if ((dateFrom && Number.isNaN(dateFrom.getTime())) || (dateTo && Number.isNaN(dateTo.getTime()))) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '<b>❌ Format tanggal tidak valid</b>\nGunakan format <code>YYYY-MM-DD</code>.',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '<b>❌ Rentang tanggal tidak valid</b>\n<code>dateFrom</code> tidak boleh lebih besar dari <code>dateTo</code>.',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const result = await this.transactionService.listTransactions({
+      chatId: params.chatId,
+      limit: params.limit,
+      page: params.page,
+      type: params.type,
+      category: params.category,
+      merchant: params.merchant,
+      dateFrom,
+      dateTo,
+    });
+
+    const activeFilters = [
+      params.type ? `tipe: ${params.type}` : null,
+      params.category ? `kategori: ${params.category}` : null,
+      params.merchant ? `merchant: ${params.merchant}` : null,
+      params.dateFrom || params.dateTo ? `tanggal: ${params.dateFrom ?? 'awal'} s/d ${params.dateTo ?? 'akhir'}` : null,
+    ].filter(Boolean);
+
+    const startIndex = result.total === 0 ? 0 : (result.page - 1) * result.limit + 1;
+    const endIndex = (result.page - 1) * result.limit + result.transactions.length;
+    const text = result.transactions.map((transaction: any) => formatTransactionLine(transaction)).join('---\n');
     
     return {
       content: [
         {
           type: 'text',
-          text: text || '<b>Belum ada transaksi.</b>',
+          text: text
+            ? `<b>DAFTAR TRANSAKSI</b>\n` +
+              `📄 Halaman: <b>${result.page}</b>\n` +
+              `🧾 Menampilkan: <b>${startIndex}-${endIndex}</b> dari <b>${result.total}</b> transaksi\n` +
+              `📌 Filter: ${activeFilters.length > 0 ? `<b>${activeFilters.join(' | ')}</b>` : '<b>tanpa filter khusus</b>'}` +
+              `${result.hasMore ? `\n➡️ Masih ada halaman berikutnya. Coba minta <b>halaman ${result.page + 1}</b>.` : ''}` +
+              `\n\n${text}`
+            : '<b>Belum ada transaksi yang cocok.</b>',
         },
       ],
     };
