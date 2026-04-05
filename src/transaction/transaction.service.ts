@@ -277,4 +277,31 @@ export class TransactionService {
     const resolved = await this.resolveTransactionById(id, chatId);
     return resolved.status === 'resolved' ? resolved.record : null;
   }
+
+  async deleteTransaction(id: string, chatId: string) {
+    const resolved = await this.resolveTransactionById(id, chatId);
+
+    if (resolved.status !== 'resolved') {
+      return resolved;
+    }
+
+    const transaction = resolved.record;
+    const debtCount = transaction.debts?.length ?? 0;
+    if (debtCount > 0) {
+      return {
+        status: 'has_related_debts' as const,
+        record: transaction,
+        debtCount,
+      };
+    }
+
+    await this.prisma.transaction.delete({
+      where: { id: transaction.id },
+    });
+
+    return {
+      status: 'deleted' as const,
+      record: transaction,
+    };
+  }
 }

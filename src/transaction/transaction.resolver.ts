@@ -381,4 +381,80 @@ export class TransactionResolver {
       content: [{ type: 'text', text }],
     };
   }
+
+  @Tool({
+    name: 'delete_transaction',
+    description: 'Delete a transaction by full UUID or short ID. Use only after explicit user confirmation. Refuses deletion if the transaction still has related debts/split bill records.',
+    paramsSchema: {
+      chatId: z.string().describe('Unique ID for the chat or user'),
+      transactionId: z.string().describe('The full UUID or the short 8-character ID'),
+    },
+  })
+  async deleteTransaction({ chatId, transactionId }: { chatId: string; transactionId: string }) {
+    this.logger.log(`Tool delete_transaction called for ${transactionId}`);
+    const result = await this.transactionService.deleteTransaction(transactionId, chatId);
+
+    if (result.status === 'ambiguous') {
+      const options = result.matches
+        .map(
+          (match: any) =>
+            `- <code>${match.id.substring(0, 8)}</code> | ${match.date.toISOString().split('T')[0]} | ${match.merchant ?? 'Unknown'} | ${formatCurrency(match.amount)}`,
+        )
+        .join('\n');
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `<b>⚠️ ID transaksi ambigu</b>\n` +
+              `Ada beberapa transaksi yang cocok dengan ID <code>${transactionId}</code>.\n` +
+              `Balas lagi dengan salah satu ID berikut:\n${options}`,
+          },
+        ],
+      };
+    }
+
+    if (result.status === 'not_found') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `<b>❌ Transaksi tidak ditemukan</b>\n` +
+              `🆔 ID: <code>${transactionId}</code>`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    if (result.status === 'has_related_debts') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              `<b>❌ Transaksi tidak bisa dihapus</b>\n` +
+              `Transaksi ini masih terhubung ke <b>${result.debtCount}</b> catatan hutang/split bill.\n` +
+              `Selesaikan atau batalkan relasi split bill dulu sebelum menghapus transaksi.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text:
+            `<b>✅ Transaksi berhasil dihapus</b>\n` +
+            `🆔 ID: <code>${result.record.id.substring(0, 8)}</code>\n` +
+            `🏢 Merchant: <b>${result.record.merchant ?? '-'}</b>\n` +
+            `💵 Jumlah: <code>${formatCurrency(result.record.amount)}</code>`,
+        },
+      ],
+    };
+  }
 }
